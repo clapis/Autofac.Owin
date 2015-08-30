@@ -67,27 +67,27 @@ namespace Owin
                 }
             });
 
-            UseMiddlewareFromContainer(app, container);
+            // Registration on the container shouldn't imply registration on the pipeline. This also leads
+            // to issues when trying to specify the order in which middleware is registered on the pipeline.
+            // Maybe more interesting to provide a separate method for registration on the pipeline?
+            // UseMiddlewareFromContainer(app, container);
 
             app.Properties.Add(MiddlewareRegisteredKey, true);
 
             return app;
         }
 
+        /// <summary>
+        /// Register a middleware on the OWIN pipeline using Autofac to resolve components
+        /// </summary>
+        /// <param name="app">The application builder.</param>
+        /// <typeparam name="T">OwinMiddleware</typeparam>
+        /// <returns>The application builder.</returns>
         [SecuritySafeCritical]
-        static void UseMiddlewareFromContainer(this IAppBuilder app, IComponentContext container)
+        public static IAppBuilder UseMiddlewareFromContainer<T>(this IAppBuilder app) where T : OwinMiddleware
         {
-            var services = container.ComponentRegistry.Registrations.SelectMany(r => r.Services)
-                .OfType<TypedService>()
-                .Where(s => s.ServiceType.IsAssignableTo<OwinMiddleware>() && !s.ServiceType.IsAbstract)
-                .Select(service => typeof(AutofacMiddleware<>).MakeGenericType(service.ServiceType))
-                .Where(serviceType => !container.IsRegistered(serviceType));
-
-            var typedServices = services.ToArray();
-            if (!typedServices.Any()) return;
-
-            foreach (var typedService in typedServices)
-                app.Use(typedService);
+            return app.Use<AutofacMiddleware<T>>();
         }
+
     }
 }
